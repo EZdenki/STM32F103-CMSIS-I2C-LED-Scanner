@@ -69,8 +69,13 @@
 #include <stdlib.h>
 #include "stm32f103x8.h"  // Primary CMSIS header file
 
+
+//  I2C1_init
+//    Initialize theGPIO B6 and B7 as alternate function pins.
+//    Set the I2C timing/clock registers.
+//    Enable the I2C peripheral.
 void
-AHT10_init( void )
+I2C1_init( void )
 {
   RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | 
                   RCC_APB2ENR_AFIOEN ;  // Enable GPIO Port B and Alt. Func. Clocks
@@ -81,6 +86,16 @@ AHT10_init( void )
                   0b11 << GPIO_CRL_CNF7_Pos  |
                   0b11 << GPIO_CRL_MODE6_Pos |
                   0b11 << GPIO_CRL_MODE7_Pos );
+
+  I2C1->TRISE |= 0x02;                      // Set the TRISE time
+  I2C1->CR1   |=  I2C_CR1_SWRST;            // Set I2C reset bit
+  I2C1->CR1   &= ~I2C_CR1_SWRST;            // Clear I2C reset bit
+  I2C1->CR2   |= 0x08 << I2C_CR2_FREQ_Pos;  // Set to APB1 Peripheral Clock freq. in MHz (8 MHz = 8)
+  I2C1->TRISE  = 0x09;                      // Set to APB1 Peripheral Clock Freq. in MHz + 1 (8+1 = 9)
+  I2C1->CCR    = 0x28;                      // CCR = 5 us * APB1 Peripheral clock speed (8E6) = 40 (0x28)
+                                            // F/S and DUTY bits are 0 as not using "fast mode" i2c.
+  I2C1->OAR1   = 0x4000;                    // Probably not needed when you are the master
+  I2C1->CR1   |= I2C_CR1_PE;                // Turn on I2C peripheral
 }
 
 
@@ -96,7 +111,6 @@ delay_ms( uint16_t d )
     for( uint16_t y=0; y<800; y++) ; 
   }
 }
-
 
 
 void
@@ -138,46 +152,21 @@ I2C_stop( void )
 }
 
 
-void
-I2C_writeMulti( uint8_t *data, uint8_t size)
-{
-  while( !( I2C1->SR1 & I2C_SR1_TXE )) ;    // Wait for TXE bit to be set
-    while( size )
-    {
-      while ( !(I2C1->SR1 & I2C_SR1_TXE )) ;  // Wait for TXE bit to be set
-      I2C1->DR = (volatile uint32_t)*data++;  // Send data byte
-      size--;
-    }
-    while( !( I2C1->SR1 & I2C_SR1_BTF )) ;
-}
-
-
 int
 main()
 {
   uint8_t  light=0;
-  AHT10_init();
-
-  I2C1->TRISE |= 0x02;                      // Set the TRISE time
-  I2C1->CR1   |=  I2C_CR1_SWRST;            // Set I2C reset bit
-  I2C1->CR1   &= ~I2C_CR1_SWRST;            // Clear I2C reset bit
-  I2C1->CR2   |= 0x08 << I2C_CR2_FREQ_Pos;  // Set to APB1 Peripheral Clock freq. in MHz (8 MHz = 8)
-  I2C1->TRISE  = 0x09;                      // Set to APB1 Peripheral Clock Freq. in MHz + 1 (8+1 = 9)
-  I2C1->CCR    = 0x28;                      // CCR = 5 us * APB1 Peripheral clock speed (8E6) = 40 (0x28)
-                                            // F/S and DUTY bits are 0 as not using "fast mode" i2c.
-  I2C1->OAR1   = 0x4000;                    // Probably not needed when you are the master
-  I2C1->CR1   |= I2C_CR1_PE;                // Turn on I2C peripheral
+  I2C1_init();
 
 
   while( 1 )
   {
-
     I2C_start();
     I2C_address( 0x3f );
     I2C_write( 1<<light );
     I2C_stop();
 
-    delay_ms( 200 );
+    delay_ms( 100 );
     if( ++light>7 )
       light = 0;
   }  

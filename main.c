@@ -71,7 +71,7 @@
 
 #include "stm32f103x8.h"  // Primary CMSIS header file
 #include "STM32F103-CMSIS-I2C-lib.c"
-#include "STM32F103-pause-lib.c"
+#include "STM32F103-Delay-lib.c"
 int
 main()
 {
